@@ -1,0 +1,612 @@
+-- BASES DE DATOS 1 - TAREA 5: CONSULTAS DML Y VISTAS (VIEWS)
+-- Por: María Sofía Pabón Pabón
+-- 1. LIMPIEZA DE ESTRUCTURAS PREVIAS
+DROP VIEW IF EXISTS vw_metricas_eventos_grupos CASCADE;
+DROP VIEW IF EXISTS vw_analitica_publicaciones CASCADE;
+DROP VIEW IF EXISTS vw_perfil_estudiantil_completo CASCADE;
+
+DROP TABLE IF EXISTS mentoria, seguir, reaccion, asistente_evento, miembro_grupo, estudiante_interes, estudiante_habilidad, interes, habilidad, evento, grupo, comentario, publicacion, perfil, estudiante CASCADE;
+
+
+-- 2. MODELO FÍSICO LAS 15 TABLAS QUE SIEMPRE USAMOS 
+CREATE TABLE estudiante (
+    id_estudiante SERIAL,
+    nombre VARCHAR(50) NOT NULL,
+    apellido VARCHAR(50) NOT NULL,
+    correo VARCHAR(100) NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    ultima_actividad TIMESTAMP NOT NULL,
+    estado VARCHAR(20) DEFAULT 'activo' NOT NULL,
+    CONSTRAINT pk_estudiante PRIMARY KEY (id_estudiante),
+    CONSTRAINT uk_estudiante_correo UNIQUE (correo)
+);
+
+CREATE TABLE perfil (
+    id_perfil SERIAL,
+    id_estudiante INT NOT NULL,
+    area_estudio VARCHAR(100),
+    biografia TEXT,
+    programa VARCHAR(100) NOT NULL,
+    semestre INT NOT NULL,
+    ciudad VARCHAR(50),
+    foto_perfil VARCHAR(255),
+    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT pk_perfil PRIMARY KEY (id_perfil),
+    CONSTRAINT uk_perfil_estudiante UNIQUE (id_estudiante),
+    CONSTRAINT fk_perfil_estudiante FOREIGN KEY (id_estudiante) 
+        REFERENCES estudiante(id_estudiante) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE publicacion (
+    id_publicacion SERIAL,
+    id_estudiante INT NOT NULL,
+    contenido TEXT NOT NULL,
+    tipo VARCHAR(50) NOT NULL,
+    metadatos_bigdata JSONB,
+    fecha_publicacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT pk_publicacion PRIMARY KEY (id_publicacion),
+    CONSTRAINT fk_publicacion_estudiante FOREIGN KEY (id_estudiante) 
+        REFERENCES estudiante(id_estudiante) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE comentario (
+    id_comentario SERIAL,
+    id_publicacion INT NOT NULL,
+    id_estudiante INT NOT NULL,
+    comentario TEXT NOT NULL,
+    fecha_comentario TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT pk_comentario PRIMARY KEY (id_comentario),
+    CONSTRAINT fk_comentario_publicacion FOREIGN KEY (id_publicacion) 
+        REFERENCES publicacion(id_publicacion) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_comentario_estudiante FOREIGN KEY (id_estudiante) 
+        REFERENCES estudiante(id_estudiante) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE grupo (
+    id_grupo SERIAL,
+    creador_id INT NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    descripcion TEXT,
+    tipo VARCHAR(50) NOT NULL,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    estado VARCHAR(20) DEFAULT 'activo' NOT NULL,
+    CONSTRAINT pk_grupo PRIMARY KEY (id_grupo),
+    CONSTRAINT fk_grupo_creador FOREIGN KEY (creador_id) 
+        REFERENCES estudiante(id_estudiante) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE evento (
+    id_evento SERIAL,
+    id_grupo INT,
+    organizador INT NOT NULL,
+    nombre VARCHAR(150) NOT NULL,
+    descripcion TEXT,
+    ubicacion_iot JSONB,
+    fecha_inicio TIMESTAMP NOT NULL,
+    fecha_fin TIMESTAMP NOT NULL,
+    lugar VARCHAR(150) NOT NULL,
+    modalidad VARCHAR(50) NOT NULL,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT pk_evento PRIMARY KEY (id_evento),
+    CONSTRAINT fk_evento_grupo FOREIGN KEY (id_grupo) 
+        REFERENCES grupo(id_grupo) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_evento_organizador FOREIGN KEY (organizador) 
+        REFERENCES estudiante(id_estudiante) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE interes (
+    id_interes SERIAL,
+    nombre VARCHAR(100) NOT NULL,
+    descripcion TEXT,
+    CONSTRAINT pk_interes PRIMARY KEY (id_interes),
+    CONSTRAINT uk_interes_nombre UNIQUE (nombre)
+);
+
+CREATE TABLE habilidad (
+    id_habilidad SERIAL,
+    nombre VARCHAR(100) NOT NULL,
+    descripcion TEXT,
+    CONSTRAINT pk_habilidad PRIMARY KEY (id_habilidad),
+    CONSTRAINT uk_habilidad_nombre UNIQUE (nombre)
+);
+
+CREATE TABLE estudiante_habilidad (
+    id_estudiante INT NOT NULL,
+    id_habilidad INT NOT NULL,
+    nivel VARCHAR(20),
+    fecha_agregado TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT pk_estudiante_habilidad PRIMARY KEY (id_estudiante, id_habilidad),
+    CONSTRAINT fk_esthab_estudiante FOREIGN KEY (id_estudiante) 
+        REFERENCES estudiante(id_estudiante) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_esthab_habilidad FOREIGN KEY (id_habilidad) 
+        REFERENCES habilidad(id_habilidad) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE estudiante_interes (
+    id_estudiante INT NOT NULL,
+    id_interes INT NOT NULL,
+    fecha_agregado TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT pk_estudiante_interes PRIMARY KEY (id_estudiante, id_interes),
+    CONSTRAINT fk_estint_estudiante FOREIGN KEY (id_estudiante) 
+        REFERENCES estudiante(id_estudiante) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_estint_interes FOREIGN KEY (id_interes) 
+        REFERENCES interes(id_interes) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE miembro_grupo (
+    id_estudiante INT NOT NULL,
+    id_grupo INT NOT NULL,
+    fecha_ingreso TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    rol VARCHAR(30) DEFAULT 'miembro',
+    CONSTRAINT pk_miembro_grupo PRIMARY KEY (id_estudiante, id_grupo),
+    CONSTRAINT fk_mgrupo_estudiante FOREIGN KEY (id_estudiante) 
+        REFERENCES estudiante(id_estudiante) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_mgrupo_grupo FOREIGN KEY (id_grupo) 
+        REFERENCES grupo(id_grupo) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE asistente_evento (
+    id_estudiante INT NOT NULL,
+    id_evento INT NOT NULL,
+    estado VARCHAR(30) DEFAULT 'confirmado',
+    fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT pk_asistente_evento PRIMARY KEY (id_estudiante, id_evento),
+    CONSTRAINT fk_asist_estudiante FOREIGN KEY (id_estudiante) 
+        REFERENCES estudiante(id_estudiante) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_asist_evento FOREIGN KEY (id_evento) 
+        REFERENCES evento(id_evento) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE reaccion (
+    id_estudiante INT NOT NULL,
+    id_publicacion INT NOT NULL,
+    tipo_reaccion VARCHAR(30) NOT NULL,
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT pk_reaccion PRIMARY KEY (id_estudiante, id_publicacion),
+    CONSTRAINT fk_reac_estudiante FOREIGN KEY (id_estudiante) 
+        REFERENCES estudiante(id_estudiante) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_reac_publicacion FOREIGN KEY (id_publicacion) 
+        REFERENCES publicacion(id_publicacion) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE seguir (
+    id_seguidor INT NOT NULL,
+    id_seguido INT NOT NULL,
+    fecha_seguimiento TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT pk_seguir PRIMARY KEY (id_seguidor, id_seguido),
+    CONSTRAINT fk_seguir_seguidor FOREIGN KEY (id_seguidor) 
+        REFERENCES estudiante(id_estudiante) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_seguir_seguido FOREIGN KEY (id_seguido) 
+        REFERENCES estudiante(id_estudiante) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE mentoria (
+    id_mentor INT NOT NULL,
+    id_aprendiz INT NOT NULL,
+    tema VARCHAR(100) NOT NULL,
+    estado VARCHAR(30) NOT NULL,
+    fecha_mentoria TIMESTAMP NOT NULL,
+    CONSTRAINT pk_mentoria PRIMARY KEY (id_mentor, id_aprendiz),
+    CONSTRAINT fk_mentoria_mentor FOREIGN KEY (id_mentor) 
+        REFERENCES estudiante(id_estudiante) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_mentoria_aprendiz FOREIGN KEY (id_aprendiz) 
+        REFERENCES estudiante(id_estudiante) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+-- 3. INSERCIÓN DE DATOS DE PRUEBA USADOS EN LA TAREA 4, PERO AJUSTADOS EN ESTA
+INSERT INTO estudiante (nombre, apellido, correo, password, ultima_actividad, estado) VALUES
+('María Sofía', 'Pabón', 'sofia.pabon@pascualbravo.edu.co', 'pass123', NOW(), 'activo'),
+('Marina', 'Rodríguez', 'marina.rodriguez@pascualbravo.edu.co', 'pass123', NOW(), 'activo'),
+('Luna', 'Valencia', 'luna.valencia@pascualbravo.edu.co', 'pass123', NOW(), 'activo'),
+('Juan', 'Hincapié', 'juan.hincapie@pascualbravo.edu.co', 'pass123', NOW(), 'activo'),
+('Julieta', 'Rios', 'julieta.rios@pascualbravo.edu.co', 'pass123', NOW(), 'inactivo'),
+('Kevin', 'Gómez', 'kevin.gomez@pascualbravo.edu.co', 'pass123', NOW(), 'activo');
+
+INSERT INTO perfil (id_estudiante, area_estudio, biografia, programa, semestre, ciudad) VALUES
+(1, 'Desarrollo de Software', 'Apasionada por las BD y C++', 'Tecnología en Desarrollo de Software', 4, 'Medellín'),
+(2, 'Sistemas', 'Interesada en mentorías de bases de datos', 'Ingeniería de Software', 6, 'Medellín'),
+(3, 'Inteligencia Artificial', 'Estudiante de IA', 'Tecnología en Desarrollo de Software', 2, 'Envigado'),
+(4, 'Electrónica', 'Me gusta la robótica e IoT', 'Ingeniería Electrónica', 5, 'Medellín'),
+(6, 'Bases de Datos Avanzadas', 'Monitor de SQL y PostgreSQL', 'Tecnología en Desarrollo de Software', 7, 'Bello');
+
+INSERT INTO habilidad (nombre, descripcion) VALUES
+('C++', 'Programación estructurada y POO en C++'),
+('PostgreSQL', 'Manejo de SQL DDL, DML y Vistas'),
+('Python', 'Análisis de datos y scripts'),
+('Diseño UI/UX', 'Figma y diseño de interfaces');
+
+INSERT INTO estudiante_habilidad (id_estudiante, id_habilidad, nivel) VALUES
+(1, 1, 'Avanzado'),
+(1, 2, 'Intermedio'),
+(2, 2, 'Avanzado'),
+(4, 3, 'Básico'),
+(6, 2, 'Experto');
+
+INSERT INTO interes (nombre, descripcion) VALUES
+('Programación Competitiva', 'Entrenamiento para Hackatones'),
+('Desarrollo Web', 'Frontend y Backend'),
+('Base de Datos', 'Optimización de consultas DML');
+
+INSERT INTO estudiante_interes (id_estudiante, id_interes) VALUES
+(1, 1), (1, 3),
+(2, 3),
+(3, 2),
+(6, 1), (6, 3);
+
+INSERT INTO publicacion (id_estudiante, contenido, tipo, metadatos_bigdata) VALUES
+(1, '¡Bienvenidos a la Red Pascualina!', 'post', '{"dispositivo": "Android", "ip": "192.168.1.1"}'::jsonb),
+(1, 'Revisando temas de PostgreSQL y DML', 'post', '{"dispositivo": "Windows", "ip": "192.168.1.2"}'::jsonb),
+(2, '¿Alguien para estudiar Algebra Lineal?', 'pregunta', '{"dispositivo": "iOS", "ip": "192.168.1.3"}'::jsonb),
+(3, 'Taller de PAP para calculo mañana', 'evento_info', '{"dispositivo": "Linux", "ip": "192.168.1.4"}'::jsonb);
+
+INSERT INTO comentario (id_publicacion, id_estudiante, comentario) VALUES
+(1, 2, '¡Muy interesante!'),
+(1, 3, 'Yo ire, sin falta'),
+(2, 2, 'Regístrenme para esa actividad'),
+(3, 1, 'Yo me apunto para el grupo de estudio');
+
+INSERT INTO reaccion (id_estudiante, id_publicacion, tipo_reaccion) VALUES
+(1, 1, 'me_gusta'), (2, 1, 'me_gusta'), (3, 1, 'excelente'), (4, 1, 'me_gusta'),
+(1, 2, 'me_gusta'), (2, 2, 'me_gusta'),
+(3, 3, 'me_gusta');
+
+INSERT INTO grupo (creador_id, nombre, descripcion, tipo) VALUES
+(1, 'English club', 'Grupo para proyectos de habla inglesa', 'Académico'),
+(2, 'Club de Software', 'Estudio de PostgreSQL y C++', 'Académico');
+
+INSERT INTO miembro_grupo (id_estudiante, id_grupo, rol) VALUES
+(1, 1, 'lider'),
+(1, 2, 'miembro'),
+(2, 2, 'lider'),
+(6, 2, 'miembro');
+
+INSERT INTO evento (organizador, id_grupo, nombre, descripcion, fecha_inicio, fecha_fin, lugar, modalidad, ubicacion_iot) VALUES
+(1, 1, 'Hackathon Pascualina 2026', 'Competencia de prototipos', NOW(), NOW() + INTERVAL '5 hours', 'Bloque 8 - Aula 201', 'Presencial', '{"aforo_max": 20, "sensor_id": "SENS-01"}'::jsonb),
+(2, 2, 'Taller de SQL Avanzado', 'Creación de vistas y optimización', NOW(), NOW() + INTERVAL '2 hours', 'Aula Virtual', 'Virtual', '{"aforo_max": 50, "sensor_id": "SENS-02"}'::jsonb);
+
+INSERT INTO asistente_evento (id_estudiante, id_evento, estado) VALUES
+(1, 1, 'confirmado'), (2, 1, 'confirmado'), (3, 1, 'confirmado'), (4, 1, 'confirmado'),
+(2, 2, 'confirmado'), (6, 2, 'confirmado');
+
+
+
+
+-- 4. CREACIÓN DE LAS 3 VISTAS (VIEWS)
+
+-- VISTA 1: Perfil Estudiantil Completo
+-- el propósito es que de una vista rápida la información básica del estudiante junto a su programa, semestre y el número de habilidades e intereses que ha registrado en la red
+
+CREATE OR REPLACE VIEW vw_perfil_estudiantil_completo AS
+SELECT 
+    -- Tomamos el ID único del estudiante
+    e.id_estudiante,
+    
+    -- Unimos el nombre y apellido con un espacio en medio para mostrar el nombre completo
+    e.nombre || ' ' || e.apellido AS nombre_completo,
+    
+    --Ponemos el correo institucional
+    e.correo,
+    
+    -- traemos el programa académico (ej: Tecnología en Desarrollo de Software) y el semestre desde la tabla perfil
+    p.programa,
+    p.semestre,
+    p.area_estudio,
+    
+    -- Se cuenta cuántas habilidades distintas tiene registradas el estudiante (evita contar repetidos)
+    COUNT(DISTINCT eh.id_habilidad) AS total_habilidades,
+    
+    -- Se cuenta cuántos intereses distintos ha seleccionado en la plataforma
+    COUNT(DISTINCT ei.id_interes) AS total_intereses
+
+FROM 
+    -- tabla base, en esta arrancamos con la tabla 'estudiante' (alias 'e')
+    estudiante e
+    
+-- Aquí se usa LEFT JOIN en lugar de INNER JOIN para que si un estudiante está recién registrado y aun no ha llenado su perfil, habilidades o intereses, no desaparezca de la lista, sino que aparezca con total = 0 para ser mas ordenados y tener buenas practicas 
+LEFT JOIN 
+    -- Se cruza con la tabla 'perfil' usando la llave foránea id_estudiante
+    perfil p ON e.id_estudiante = p.id_estudiante
+LEFT JOIN 
+    -- Cruzamos con la tabla intermedia 'estudiante_habilidad' para llegar a sus habilidades
+    estudiante_habilidad eh ON e.id_estudiante = eh.id_estudiante
+LEFT JOIN 
+    -- Cruzamos con la tabla intermedia 'estudiante_interes' para llegar a sus intereses
+    estudiante_interes ei ON e.id_estudiante = ei.id_estudiante
+
+-- REGLA DE SQL: Como usamos COUNT arriba, debemos listar en el GROUP BY todas las columnas individuales que están en el SELECT para que agregue los totales por cada estudiante.
+GROUP BY 
+    e.id_estudiante, e.nombre, e.apellido, e.correo, p.programa, p.semestre, p.area_estudio;
+
+-- VISTA 2: Analítica de Publicaciones e Interacciones NoSQL
+-- El objetivo en esta parte es calcular métricas de interacción (likes y comentarios) por cada publicación extrayendo el tipo de dispositivo desde el campo JSONB/NoSQL para los tableros de control
+CREATE OR REPLACE VIEW vw_analitica_publicaciones AS
+SELECT 
+    -- Identificador de la publicación
+    p.id_publicacion,
+    
+    -- Autor del post (unimos nombre y apellido)
+    e.nombre || ' ' || e.apellido AS autor,
+    
+    -- Contenido del post y su categoría (pregunta, meme, evento_info)
+    p.contenido,
+    p.tipo,
+    
+    -- EXTRACCIÓN NoSQL/JSONB: Con la flechita '->>' extraemos la propiedad 'dispositivo' que viene guardada en formato JSON (Android, Windows, iOS, etc)
+    p.metadatos_bigdata->>'dispositivo' AS dispositivo_origen,
+    
+    -- Contamos cuántos estudiantes diferentes le dieron 'me gusta' u otra reacción a este post
+    COUNT(DISTINCT r.id_estudiante) AS total_reacciones,
+    
+    -- Contamos cuántos comentarios ha recibido la publicación
+    COUNT(DISTINCT c.id_comentario) AS total_comentarios,
+    
+    -- DATO CALCULADO CON ALIAS: Sumamos reacciones + comentarios para obtener un puntaje total de popularidad
+    (COUNT(DISTINCT r.id_estudiante) + COUNT(DISTINCT c.id_comentario)) AS puntuacion_engagement
+
+FROM 
+    -- TABLA BASE: Empezamos desde las publicaciones
+    publicacion p
+    
+-- Se usa INNER JOIN con estudiante porque TODA publicación pertenece obligatoriamente a un autor registrado
+INNER JOIN 
+    estudiante e ON p.id_estudiante = e.id_estudiante
+    
+-- Aquí Usamos LEFT JOIN con reacciones y comentarios porque una publicación puede ser nueva  y no tener aún ni reacciones ni comentarios (queremos que aparezca con 0 en lugar de esconderse)
+LEFT JOIN 
+    reaccion r ON p.id_publicacion = r.id_publicacion
+LEFT JOIN 
+    comentario c ON p.id_publicacion = c.id_publicacion
+
+-- Agrupamos por publicación para consolidar los conteos individuales
+GROUP BY 
+    p.id_publicacion, e.nombre, e.apellido, p.contenido, p.tipo, p.metadatos_bigdata;
+
+
+
+-- VISTA 3: Métricas de Eventos y Grupos de Estudio
+-- El propósito es consolidar la gestión de eventos, identificando tanto el grupo organizador como el organizador, convirtiendo el aforo IoT en un número entero para calcular capacidad de dicho evento 
+
+CREATE OR REPLACE VIEW vw_metricas_eventos_grupos AS
+SELECT 
+    --ID y nombre del evento
+    ev.id_evento,
+    ev.nombre AS nombre_evento,
+    
+    -- Nombre del grupo académico que organiza el evento
+    g.nombre AS grupo_organizador,
+    
+    -- Nombre del estudiante organizador principal
+    e.nombre || ' ' || e.apellido AS organizador,
+    
+    -- Detalles del encuentro
+    ev.lugar,
+    ev.modalidad,
+    
+    -- EXTRACCIÓN IoT Y CASTING: Extraemos 'aforo_max' del JSONB con '->>'  y le ponemos '::INT' para convertirlo de texto a número entero y poder hacer cálculos matemáticos
+    (ev.ubicacion_iot->>'aforo_max')::INT AS capacidad_maxima,
+    
+    -- Contamos únicamente los asistentes cuya confirmación en la tabla intermedia sea 'confirmado'
+    COUNT(ae.id_estudiante) AS asistentes_confirmados
+
+FROM 
+    -- TABLA BASE: Empezamos desde la tabla evento
+    evento ev
+    
+-- LEFT JOIN con grupo: Un evento puede ser creado por un grupo o por un estudiante independiente sin grupo
+LEFT JOIN 
+    grupo g ON ev.id_grupo = g.id_grupo
+    
+-- INNER JOIN con estudiante: El evento siempre requiere un organizador responsable
+INNER JOIN 
+    estudiante e ON ev.organizador = e.id_estudiante
+    
+-- LEFT JOIN con asistente_evento: Cruzamos con la tabla intermedia filtrando solo a los confirmados
+LEFT JOIN 
+    asistente_evento ae ON ev.id_evento = ae.id_evento AND ae.estado = 'confirmado'
+
+-- Agrupamos los datos por evento para consolidar el total de asistentes
+GROUP BY 
+    ev.id_evento, ev.nombre, g.nombre, e.nombre, e.apellido, ev.lugar, ev.modalidad, ev.ubicacion_iot;
+
+
+--Resultados de las 3 vistas 
+SELECT * FROM vw_perfil_estudiantil_completo;
+SELECT * FROM vw_analitica_publicaciones;
+SELECT * FROM vw_metricas_eventos_grupos;
+
+-- 5. LAS 5 CONSULTAS DML DE MODELO DE NEGOCIO
+-- CONSULTA 1: Identificación de Candidatos a Mentores Académicos
+-- Pregunta de Negocio: ¿Qué estudiantes de semestre 4 o superior poseen habilidades en nivel "Avanzado" o "Experto" para ofrecer mentorías a los demás compañeros que lo requieran?
+SELECT 
+    -- Identificador del estudiante candidato a ser mentor
+    e.id_estudiante AS id_mentor_potencial,
+    
+    -- Se une el nombre y apellido con un espacio para obtener el nombre completo
+    e.nombre || ' ' || e.apellido AS mentor,
+    
+    --Traemos el programa académico y el semestre actual del estudiante candidato
+    p.programa,
+    p.semestre,
+    
+    -- Traemos el nombre de la habilidad que domina (ej: PostgreSQL, C++, Java)
+    h.nombre AS habilidad_dominada,
+    
+    -- Traemos el nivel asignado a esa habilidad ('Avanzado' o 'Experto')
+    eh.nivel
+
+FROM 
+    -- TABLA BASE: Iniciamos con la tabla de estudiantes
+    estudiante e
+
+
+--Cruzamos con 'perfil' para conocer el semestre y programa del estudiante
+INNER JOIN 
+    perfil p ON e.id_estudiante = p.id_estudiante
+
+-- Cruzamos con la tabla intermedia 'estudiante_habilidad' para ver sus competencias
+INNER JOIN 
+    estudiante_habilidad eh ON e.id_estudiante = eh.id_estudiante
+
+-- Cruzamos con 'habilidad' para obtener el nombre real de cada habilidad 
+INNER JOIN 
+    habilidad h ON eh.id_habilidad = h.id_habilidad
+
+WHERE 
+    -- Filtro 1. Seleccionamos solo estudiantes de semestres avanzados (4to semestre en adelante)
+    p.semestre >= 4 
+    
+    -- Filtro 2.Restringimos el nivel a únicamente 'Avanzado' o 'Experto'
+    AND eh.nivel IN ('Avanzado', 'Experto')
+
+ORDER BY 
+    -- Ordenamos la lista mostrando primero a los estudiantes de los semestres superiores
+    p.semestre DESC;
+
+
+
+-- CONSULTA 2: Ranking de Publicaciones con Mayor Engagement según Dispositivo (NoSQL/JSONB)
+-- PREGUNTA DE NEGOCIO: "¿Cuáles son las publicaciones más populares en la red social, mostrando la extracción del tipo de dispositivo utilizado guardado en el atributo JSONB / NoSQL?"
+SELECT 
+    --Tomamos el ID de la publicación 
+    id_publicacion,
+
+	autor,
+      
+    -- Le cambiamos el nombre a la columna contenido usando el ALIAS 'publicacion' para mejorar la lectura
+    contenido AS publicacion,
+    
+    dispositivo_origen,
+    total_reacciones,
+    total_comentarios,
+    puntuacion_engagement
+
+FROM 
+    -- Consultamos en la vista 2
+    vw_analitica_publicaciones
+
+WHERE 
+    -- Filtramos publicaciones que hayan tenido al menos alguna interacción (engagement > 1)
+    puntuacion_engagement > 1
+
+ORDER BY 
+    -- Ordenamos de mayor a menor según la puntuación de popularidad
+    puntuacion_engagement DESC
+
+-- Restringimos el resultado para mostrar únicamente las 5 publicaciones con mayor impacto
+LIMIT 5;
+
+-- CONSULTA 3: Porcentaje de Ocupación de Eventos mediante Sensores IoT
+-- PREGUNTA DE NEGOCIO: "¿Que eventos presentan un porcentaje de asistencia confirmada relevante (mayor al 15%) en relación con el aforo máximo registrado por los sensores IoT?"
+
+SELECT 
+    --Nombre del evento coordinado
+    nombre_evento,
+    
+    -- ubicación donde se realiza el evento
+    lugar,
+    
+--Capacidad máxima extraída del campo JSONB 'ubicacion_iot'
+    capacidad_maxima,
+    
+    -- Cantidad de estudiantes que confirmaron asistencia en la tabla intermedia
+    asistentes_confirmados,
+    
+    -- Dato calculado con alias, se hace una operación matemática de porcentaje 
+    -- Convertimos a NUMERIC para evitar decimales truncados, multiplicamos por 100 y redondeamos a 2 decimales
+    ROUND((asistentes_confirmados::NUMERIC / capacidad_maxima::NUMERIC) * 100, 2) AS porcentaje_ocupacion
+
+FROM 
+    -- CONSULTAMOS LA VISTA 3
+    vw_metricas_eventos_grupos
+
+WHERE 
+    -- Filtro 1: Nos aseguramos de evitar divisiones por cero evaluando que la capacidad sea válida
+    capacidad_maxima > 0 
+    
+    -- Filtro 2: Se evalúa matemáticamente que el porcentaje calculado sea superior al 15%
+    AND (asistentes_confirmados::NUMERIC / capacidad_maxima::NUMERIC) * 100 > 15.0
+
+ORDER BY 
+    -- Ordenamos la lista colocando primero los eventos que llenaron más su aforo
+    porcentaje_ocupacion DESC;
+	
+-- CONSULTA 4: Estudiantes Talentosos con muchas habilidades e Integrados en Grupos
+-- PREGUNTA DE NEGOCIO: "¿Qué estudiantes poseen al menos 1 habilidad registrada y además pertenecen a algún grupo o club de la universidad?"
+SELECT 
+    --Identificador primario del estudiante
+    e.id_estudiante,
+    
+    --Unión de nombre y apellido con alias descriptivo
+    e.nombre || ' ' || e.apellido AS estudiante,
+    
+    -- Contamos las habilidades distintas registradas por el estudiante
+    COUNT(DISTINCT eh.id_habilidad) AS total_habilidades,
+    
+    -- Contamos a cuántos grupos académicos o clubes se ha unido
+    COUNT(DISTINCT mg.id_grupo) AS total_grupos_pertenece
+
+FROM 
+    -- TABLA BASE: Tabla estudiante
+    estudiante e
+
+--Cruzamos con la tabla intermedia de habilidades para contar su talento
+INNER JOIN 
+    estudiante_habilidad eh ON e.id_estudiante = eh.id_estudiante
+
+-- Cruzamos con la tabla intermedia 'miembro_grupo' para validar su participación
+INNER JOIN 
+    miembro_grupo mg ON e.id_estudiante = mg.id_estudiante
+
+-- Agrupamos por ID y nombre del estudiante para poder calcular los conteos por persona
+GROUP BY 
+    e.id_estudiante, e.nombre, e.apellido
+
+--Se filtran los grupos resultantes para mostrar solo quienes tengan 1 o más habilidades
+HAVING 
+    COUNT(DISTINCT eh.id_habilidad) >= 1
+
+ORDER BY 
+    -- Ordenamos los estudiantes mostramos primero a los que tienen más habilidades registradas
+    total_habilidades DESC;
+
+-- CONSULTA 5: Estudiantes Inactivos o en Riesgo de Deserción Social (Operador EXCEPT)
+-- PREGUNTA DE NEGOCIO: "¿Qué estudiantes registrados en la plataforma NUNCA han realizado ni una sola publicación ni un solo comentario hasta la fecha?"
+
+-- Escogemos el listado COMPLETO de estudiantes registrados en la red social
+SELECT 
+    id_estudiante, 
+    -- Concatenamos el nombre y apellido del estudiante
+    nombre || ' ' || apellido AS estudiante_sin_interaccion,
+    correo
+FROM 
+    estudiante
+
+-- OPERADOR DE DIFERENCIA (EXCEPT): Resta del primer conjunto todos los estudiantes que aparezcan en el segundo conjunto (ósea, elimina a los que sí interactúan)
+EXCEPT
+
+-- Unimos los estudiantes que han publicado O han comentado
+(
+    -- Estudiantes que han creado al menos una publicación
+    SELECT 
+        e.id_estudiante, 
+        e.nombre || ' ' || e.apellido,
+        e.correo 
+    FROM 
+        estudiante e
+    INNER JOIN 
+        publicacion p ON e.id_estudiante = p.id_estudiante
+    
+    -- OPERADOR UNION: Junta las dos listas de estudiantes activos
+    UNION
+    
+    -- Estudiantes que han escrito al menos un comentario
+    SELECT 
+        e.id_estudiante, 
+        e.nombre || ' ' || e.apellido,
+        e.correo 
+    FROM 
+        estudiante e
+    INNER JOIN 
+        comentario c ON e.id_estudiante = c.id_estudiante
+);
