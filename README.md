@@ -15,6 +15,12 @@ Implementación del sistema de consultas avanzadas (DML), vistas (`VIEW`) y mani
 
 ## Estructura del Repositorio
 
- Script completo en PostgreSQL; El informe completo en Pdf; Un Pdf con el diagrama; Y un enlace al video de Youtube 
+
+Todos los archivos de la entrega se encuentran organizados dentro de la carpeta **`Tarea 5/`**:
+
+* **`script_TAREA5.sql`:** Script completo en PostgreSQL 17 con el DDL, datos de prueba, vistas y consultas DML.
+* **`Informe_RedSocial5.pdf`:** Documento técnico con el análisis, código SQL, resultados y conclusiones.
+* **`DiagramaActualizadoTarea_5.pdf`:** Diagrama Entidad-Relación actualizado de la base de datos.
+* **`video/`:** Carpeta con el enlace directo a la sustentación en YouTube.
 
 
